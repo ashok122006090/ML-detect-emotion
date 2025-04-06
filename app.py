@@ -1,29 +1,31 @@
 from fastapi import FastAPI, Request
-from transformers import pipeline
+import joblib
 from fastapi.middleware.cors import CORSMiddleware
 
+# Load the scikit-learn model
+model = joblib.load("emotion_model.pkl")
 
 app = FastAPI()
 
-
-# Allow access from other apps (like your Java backend)
+# Enable CORS
 app.add_middleware(
-   CORSMiddleware,
-   allow_origins=["*"],
-   allow_methods=["*"],
-   allow_headers=["*"],
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
+@app.get("/")
+def root():
+    return {"message": "Emotion detection API is up!"}
 
-# Load ML model
-classifier = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base", return_all_scores=False)
+@app.post("/predict")
+async def predict(request: Request):
+    data = await request.json()
+    text = data.get("text", "")
 
+    if not text:
+        return {"error": "No text provided"}
 
-@app.post("/detect-emotion")
-async def detect_emotion(request: Request):
-   data = await request.json()
-   text = data.get("text", "")
-   if not text:
-       return {"error": "No text provided"}
-   result = classifier(text)
-   return {"emotion": result[0]["label"]}
+    prediction = model.predict([text])[0]
+    return {"emotion": prediction}
